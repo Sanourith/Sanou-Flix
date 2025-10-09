@@ -1,8 +1,3 @@
-# Sanou-Flix project
-
-# WIP
-
-## Infrastructure :
 ```
 Sanou-Flix/
 ├── README.md
