@@ -16,3 +16,9 @@ secrets/
 
 # OS
 .DS_Store
+
+# DATAS
+data/
+
+# VENV
+venv-*
