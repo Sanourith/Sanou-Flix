@@ -3,10 +3,13 @@ Scans files to implement project_datas
 Check into directories & get a list of films/animes/series/p#
 """
 
+import datetime
 import os
 import re
 from pathlib import Path
+from typing import Any, Dict, List
 
+import cv2
 import pandas as pd
 
 script_path = Path(__file__).parent.absolute()
@@ -76,6 +79,25 @@ def clean_title(raw_name: str) -> str:
     return name
 
 
+def get_video_duration(film: str) -> str:
+    """Returns duration of a movie
+
+    Args:
+        film (path): Film to describe
+
+    Returns:
+        str: film furation, format HH:MM:SS
+    """
+    video = cv2.VideoCapture(f"{film}")
+    frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+    fps = video.get(cv2.CAP_PROP_FPS)
+    seconds = round(frames / fps)
+    video_time = datetime.timedelta(seconds=seconds)
+    video_time_str = str(video_time)
+    video_time_str = video_time_str.replace("0 days ", "")
+    return video_time_str
+
+
 def main():
     print("SSD path:", ssd_path)
     print("Films path exists:", films_path.exists())
@@ -85,7 +107,7 @@ def main():
         print("ERROR: Films directory not found")
         return
 
-    films_data = []
+    films_data: List[Dict[str, Any]] = []
 
     for film in sorted(films_path.iterdir()):
         if film.is_dir():
@@ -94,11 +116,21 @@ def main():
         file_extension = film.suffix.lower()
         if file_extension not in video_extensions:
             continue  # Ignore file if it's not a video
+        file_extension_str = str(file_extension)
+        file_extension_str = file_extension_str.replace(".", "")
 
         film_basename = film.stem
         film_name_clean = clean_title(film_basename)
+
+        film_duration = get_video_duration(film)
+
+        # INSERT DATA INTO CSV
         films_data.append(
-            {"NAME": film_name_clean, "EXTENTION": file_extension, "xxx": "x"}
+            {
+                "NAME": film_name_clean,
+                "EXTENTION": file_extension_str,
+                "DURATION(s)": film_duration,
+            }
         )
 
         print(f"Treated: {film_basename} - format {file_extension}")
