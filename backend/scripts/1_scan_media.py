@@ -54,7 +54,6 @@ def clean_title(raw_name: str) -> str:
     """
     name = raw_name
 
-    # 1. Retire les extensions techniques
     patterns_to_remove = [
         r"\b(1080p|720p|2160p|4k|10bit|x265|x264|hdr|dv|bluray|bdrip|web[-_ ]?dl|web[-_ ]?rip|hdtv|dvdrip|repack|multi|vostfr|vf|vff|atmos|ddp|hevc|ac3)\b",
         r"\b(fr|eng|french|english)\b",
@@ -63,17 +62,14 @@ def clean_title(raw_name: str) -> str:
     for pat in patterns_to_remove:
         name = re.sub(pat, "", name, flags=re.IGNORECASE)
 
-    # 2. Nettoie les délimiteurs inutiles
     name = re.sub(r"[\._]", " ", name)
     name = re.sub(r"\s{2,}", " ", name)
 
-    # 3. Supprime les crochets ou parenthèses contenant uniquement des tags
     name = re.sub(r"\[(.*?)\]", "", name)
     name = re.sub(
         r"\((?:(?:19|20)\d{2}|.*?rip|.*?x26[45].*?)\)", "", name, flags=re.IGNORECASE
     )
 
-    # 4. Trim final
     name = name.strip(" -_.").strip()
 
     return name
