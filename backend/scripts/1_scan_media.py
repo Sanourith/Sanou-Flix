@@ -1,6 +1,6 @@
 """
 Scans files to implement project_datas
-Check into directories & get a list of films/animes/series/p#
+Check into directories & get a list of films/animes/series
 """
 
 import datetime
@@ -15,13 +15,11 @@ import pandas as pd
 script_path = Path(__file__).parent.absolute()
 root_path = script_path.parent.parent
 
-output_csv_films = root_path / "data" / "raw" / "films_list.csv"
-
 ssd_path = Path("/media") / os.environ.get("USER", "unknown") / "SSD4OWL"
 
 # sub-dirs
-films_path = ssd_path / "1_Films"  # _test"
-anime_path = ssd_path / "2.2_Animes"
+films_path = ssd_path / "1_Films"
+animes_path = ssd_path / "2.2_Animes"
 series_path = ssd_path / "2_Series"
 
 video_extensions = {
@@ -38,13 +36,6 @@ video_extensions = {
     ".3gp",
     ".ts",
 }
-
-list_films = []
-nb_films = 0
-list_animes = []
-nb_animes = 0
-list_series = []
-nb_series = 0
 
 
 def clean_title(raw_name: str) -> str:
@@ -82,65 +73,147 @@ def get_video_duration(film: str) -> str:
         film (path): Film to describe
 
     Returns:
-        str: film furation, format HH:MM:SS
+        str: film duration, format HH:MM:SS
     """
     video = cv2.VideoCapture(f"{film}")
     frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = video.get(cv2.CAP_PROP_FPS)
+    video.release()
+
+    if fps == 0:
+        return "00:00:00"
+
     seconds = round(frames / fps)
     video_time = datetime.timedelta(seconds=seconds)
-    video_time_str = str(video_time)
-    video_time_str = video_time_str.replace("0 days ", "")
+    video_time_str = str(video_time).replace("0 days ", "")
+
     return video_time_str
 
 
+def scan_video_directory(
+    dir_path: Path,
+    output_csv_name: str,
+    category_name: str = "videos",
+    recursive: bool = False,
+) -> pd.DataFrame:
+    """
+    Scanne un répertoire de vidéos et génère un CSV avec les métadonnées.
+
+    Args:
+        dir_path: Chemin du répertoire à scanner
+        output_csv_name: Nom du fichier CSV de sortie (ex: "films_list.csv")
+        category_name: Nom de la catégorie pour les logs (ex: "films", "animes")
+        recursive: Si True, scanne les sous-dossiers (pour series/animes)
+
+    Returns:
+        DataFrame contenant les données scannées
+    """
+    print(f"\n{'='*60}")
+    print(f"Scanning {category_name.upper()}")
+    print(f"Directory: {dir_path}")
+    print(f"Recursive: {recursive}")
+    print(f"{'='*60}")
+
+    if not dir_path.exists():
+        print(f"ERROR: {category_name} directory not found at {dir_path}")
+        return pd.DataFrame()
+
+    videos_data: List[Dict[str, Any]] = []
+
+    # Si recursive, on cherche tous les fichiers vidéo en profondeur
+    if recursive:
+        # Collecter tous les fichiers vidéo, peu importe la profondeur
+        for ext in video_extensions:
+            for video_file in sorted(dir_path.rglob(f"*{ext}")):
+                # Trouver le dossier série (premier niveau sous dir_path)
+                try:
+                    relative_path = video_file.relative_to(dir_path)
+                    serie_folder = relative_path.parts[0]
+                except (ValueError, IndexError):
+                    serie_folder = "Unknown"
+
+                file_extension_str = video_file.suffix.replace(".", "")
+                file_basename = video_file.stem
+                file_name_clean = clean_title(file_basename)
+                file_duration = get_video_duration(video_file)
+
+                videos_data.append(
+                    {
+                        "NAME": file_name_clean,
+                        "EXTENTION": file_extension_str,
+                        "DURATION": file_duration,
+                        "PATH": str(video_file),
+                        "FOLDER": serie_folder,
+                    }
+                )
+
+                print(
+                    f"  [{serie_folder}] {file_basename[:40]:<40} | {file_extension_str:>4} | {file_duration}"
+                )
+
+    # Sinon, scan direct (pour films)
+    else:
+        for video_file in sorted(dir_path.iterdir()):
+            if video_file.is_dir():
+                continue
+
+            file_extension = video_file.suffix.lower()
+            if file_extension not in video_extensions:
+                continue
+
+            file_extension_str = file_extension.replace(".", "")
+            file_basename = video_file.stem
+            file_name_clean = clean_title(file_basename)
+            file_duration = get_video_duration(video_file)
+
+            videos_data.append(
+                {
+                    "NAME": file_name_clean,
+                    "EXTENTION": file_extension_str,
+                    "DURATION": file_duration,
+                    "PATH": str(video_file),
+                }
+            )
+
+            print(
+                f"Treated: {file_basename[:50]:<50} | {file_extension_str:>4} | {file_duration}"
+            )
+
+    # Create DataFrame and save to CSV
+    df = pd.DataFrame(videos_data)
+    output_path = root_path / "data" / "raw" / output_csv_name
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, encoding="utf-8", index=False)
+
+    print(f"\n{category_name.capitalize()} found: {len(df)}")
+    print(f"CSV saved to: {output_path}")
+    if not df.empty:
+        print(f"\nPreview:\n{df.head()}")
+
+    return df
+
+
 def main():
-    print("SSD path:", ssd_path)
-    print("Films path exists:", films_path.exists())
-    print("Video extensions:", ", ".join(sorted(video_extensions)))
+    print(f"SSD path: {ssd_path}")
+    print(f"Video extensions: {', '.join(sorted(video_extensions))}")
 
-    if not films_path.exists():
-        print("ERROR: Films directory not found")
-        return
+    df_films = scan_video_directory(
+        films_path, "films_list.csv", "films", recursive=False
+    )
+    df_animes = scan_video_directory(
+        animes_path, "animes_list.csv", "animes", recursive=True
+    )
+    df_series = scan_video_directory(
+        series_path, "series_list.csv", "series", recursive=True
+    )
 
-    films_data: List[Dict[str, Any]] = []
-
-    for film in sorted(films_path.iterdir()):
-        if film.is_dir():
-            continue  # Ignore directories
-
-        file_extension = film.suffix.lower()
-        if file_extension not in video_extensions:
-            continue  # Ignore file if it's not a video
-        file_extension_str = str(file_extension)
-        file_extension_str = file_extension_str.replace(".", "")
-
-        film_basename = film.stem
-        film_name_clean = clean_title(film_basename)
-
-        film_duration = get_video_duration(film)
-
-        # INSERT DATA INTO CSV
-        films_data.append(
-            {
-                "NAME": film_name_clean,
-                "EXTENTION": file_extension_str,
-                "DURATION": film_duration,
-                "PATH": film,
-            }
-        )
-
-        print(
-            f"Treated: {film_basename} - format {file_extension} - duration {film_duration} - // {film}"
-        )
-
-    df = pd.DataFrame(films_data)
-    df.to_csv(output_csv_films, encoding="utf-8", index=False)
-
-    print(f"\nFilms found : {len(df)}")
-    print(f"CSV saved to: {output_csv_films}")
-
-    print(df.head())
+    print(f"\n{'='*60}")
+    print("SUMMARY")
+    print(f"{'='*60}")
+    print(f"Films:  {len(df_films)}")
+    print(f"Animes: {len(df_animes)}")
+    print(f"Series: {len(df_series)}")
+    print(f"Total:  {len(df_films) + len(df_animes) + len(df_series)}")
 
 
 if __name__ == "__main__":
