@@ -129,11 +129,14 @@ def main():
             {
                 "NAME": film_name_clean,
                 "EXTENTION": file_extension_str,
-                "DURATION(s)": film_duration,
+                "DURATION": film_duration,
+                "PATH": film,
             }
         )
 
-        print(f"Treated: {film_basename} - format {file_extension}")
+        print(
+            f"Treated: {film_basename} - format {file_extension} - duration {film_duration} - // {film}"
+        )
 
     df = pd.DataFrame(films_data)
     df.to_csv(output_csv_films, encoding="utf-8", index=False)
