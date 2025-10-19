@@ -4,12 +4,13 @@ Check into directories & get a list of films/animes/series
 """
 
 import datetime
+import json
 import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-import cv2
 import pandas as pd
 
 script_path = Path(__file__).parent.absolute()
@@ -67,27 +68,51 @@ def clean_title(raw_name: str) -> str:
 
 
 def get_video_duration(film: str) -> str:
-    """Returns duration of a movie
+    """Returns duration of a movie using ffprobe"""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(film),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        data = json.loads(result.stdout)
+        seconds = float(data["format"]["duration"])
 
-    Args:
-        film (path): Film to describe
-
-    Returns:
-        str: film duration, format HH:MM:SS
-    """
-    video = cv2.VideoCapture(f"{film}")
-    frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-    fps = video.get(cv2.CAP_PROP_FPS)
-    video.release()
-
-    if fps == 0:
+        video_time = datetime.timedelta(seconds=int(seconds))
+        return str(video_time).replace("0 days ", "")
+    except Exception as e:
+        print(f"  Warning: Could not read duration for {film}: {e}")
         return "00:00:00"
 
-    seconds = round(frames / fps)
-    video_time = datetime.timedelta(seconds=seconds)
-    video_time_str = str(video_time).replace("0 days ", "")
 
-    return video_time_str
+# def get_video_duration(film: str) -> str:
+#     """Returns duration of a movie
+
+#     Args:
+#         film (path): Film to describe
+
+#     Returns:
+#         str: film duration, format HH:MM:SS
+#     """
+#     video = cv2.VideoCapture(f"{film}")
+#     frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+#     fps = video.get(cv2.CAP_PROP_FPS)
+#     video.release()
+
+#     if fps == 0:
+#         return "00:00:00"
+
+#     seconds = round(frames / fps)
+#     video_time = datetime.timedelta(seconds=seconds)
+#     video_time_str = str(video_time).replace("0 days ", "")
+
+#     return video_time_str
 
 
 def scan_video_directory(

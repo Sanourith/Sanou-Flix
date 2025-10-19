@@ -51,8 +51,8 @@ for series_name in "${series_dirs[@]}"; do
     cd "$ssd_dir/$series_name" || continue
 
     # Find directories & loose_videos
-    mapfile -t season_dirs < <(find . -maxdepth 1 -type d ! -name "." ! -name "Additional" ! -name "TO_BE_MODIFIED" -printf "%P\n" | sort)
-    mapfile -t loose_videos < <(find . -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "$.flv" \) | sort)
+    mapfile -t season_dirs < <(find . -maxdepth 1 -type d ! -name "." ! -name "Complete" ! -name "Additional" ! -name "TO_BE_MODIFIED" -printf "%P\n" | sort)
+    mapfile -t loose_videos < <(find . -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.flv" \) | sort)
 
     # If directories & loose_videos exist
     if [[ ${#loose_videos[@]} -gt 0 ]] && [[ ${#season_dirs[@]} -gt 0 ]]; then
@@ -71,7 +71,7 @@ for series_name in "${series_dirs[@]}"; do
     if [[ ${#season_dirs[@]} -eq 0 ]]; then
         echo "No directory found, creating 'TO_BE_MODIFIED'..."
 
-        mapfile -t video_files < <(find . -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "$.flv" \) | sort)
+        mapfile -t video_files < <(find . -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.flv" \) | sort)
 
         if [[ ${#video_files[@]} -eq 0 ]]; then
             echo "  No video found, nexting..."
@@ -126,7 +126,7 @@ for series_name in "${series_dirs[@]}"; do
             fi
 
             ((episode_num++))
-        done < <(find "$old_name" -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "$.flv" \) -print0 | sort -z)
+        done < <(find "$old_name" -maxdepth 1 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.flv" \) -print0 | sort -z)
 
         if $need_rename && [[ -d "$old_name" ]] && [[ -z "$(ls -A "$old_name")" ]]; then
             rmdir "$old_name"
