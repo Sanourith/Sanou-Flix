@@ -6,7 +6,7 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 echo "This script will automatically rename every directory into your SSD."
 read -p "Which directory do you want to rename ? (anime/serie) " answer
 
-case ${answer,,} in  # ${answer,,} = lowercase automatique
+case ${answer,,} in  # ${answer,,} = lowercase auto
   anime|animes)
     media="2.2_Animes"
     ;;
