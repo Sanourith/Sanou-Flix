@@ -1,13 +1,29 @@
 #!/bin/bash
-set -x
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 ##### CHANGE DIRECTORY FOR SERIES' ONE IF NEEDED (eg "2.3_Series")
-ssd_dir="/media/psowl/SSD4OWL/2.2_Animes"
+read -p "Which directory do you want to rename ? (anime/serie) " answer
+
+case ${answer,,} in  # ${answer,,} = lowercase auto
+  anime|animes)
+    media="2.2_Animes"
+    ;;
+  serie|series)
+    media="2_Series"
+    ;;
+  *)
+    echo "Unknown option: $answer"
+    echo "Please choose: anime or serie"
+    exit 1
+    ;;
+esac
+
+ssd_dir="/media/psowl/SSD4OWL/$media"
 
 # ASK DIR NAME
-echo "This script will only treat one directory."
+echo "This script will only treat one directory from '$media' directory"
 read -p "Enter the name of the directory you'll rename (eg: Dan_Da_Dan): " series_name
 
 if [[ -z "$series_name" ]]; then

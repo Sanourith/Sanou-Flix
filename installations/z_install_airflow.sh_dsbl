@@ -1,0 +1,74 @@
+#!/bin/bash
+
+set -e  # Arrête le script en cas d'erreur
+
+echo "Installation d'Apache Airflow en cours..."
+
+# Variables
+AIRFLOW_VERSION=3.0.6
+PYTHON_VERSION="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+AIRFLOW_HOME="${HOME}/airflow"
+
+# export AIRFLOW_HOME=~/airflow
+export AIRFLOW_HOME=~/work/dst_airlines_remastered/dags
+
+echo "Version Python détectée: ${PYTHON_VERSION}"
+echo "Répertoire Airflow: ${AIRFLOW_HOME}"
+
+# Vérification Python
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Python3 n'est pas installé. Installation requise."
+    exit 1
+fi
+
+# Installation d'Airflow
+echo " Installation d'Airflow ${AIRFLOW_VERSION}..."
+pip3 install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+
+# Configuration de l'environnement
+echo "Configuration de l'environnement..."
+export AIRFLOW_HOME="${AIRFLOW_HOME}"
+
+# Ajout de la variable d'environnement au bashrc/zshrc
+if [[ "$SHELL" == *"zsh"* ]]; then
+    SHELL_RC="${HOME}/.zshrc"
+else
+    SHELL_RC="${HOME}/.bashrc"
+fi
+
+if ! grep -q "export AIRFLOW_HOME" "${SHELL_RC}" 2>/dev/null; then
+    echo "export AIRFLOW_HOME=${AIRFLOW_HOME}" >> "${SHELL_RC}"
+    echo "✅ Variable AIRFLOW_HOME ajoutée à ${SHELL_RC}"
+fi
+
+# Initialisation de la base de données
+echo "Initialisation de la base de données..."
+echo "Penser à CTRL+C pendant l'exécution des prochains logs... (Ce message restera 20s)"
+sleep 20
+airflow standalone
+# airflow db reset -y
+
+# Création d'un utilisateur admin
+echo "Création de l'utilisateur admin..."
+# airflow users create \
+#     --username admin \
+#     --firstname Admin \
+#     --lastname User \
+#     --role Admin \
+#     --email admin@example.com \
+#     --password admin
+
+echo ""
+echo "Installation terminée !"
+echo ""
+echo "Commandes utiles :"
+echo "   • Démarrer le scheduler: airflow scheduler"
+echo "   • Démarrer le webserver: airflow webserver --port 8080"
+echo "   • Accéder à l'interface: http://localhost:8080"
+echo "   • Login: admin / admin"
+echo ""
+echo "Pense à sourcer le shell ou redémarrer le terminal :"
+echo "   source ${SHELL_RC}"
+echo ""
+echo "Ready to fly!"
