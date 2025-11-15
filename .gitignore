@@ -18,6 +18,8 @@ secrets/
 .DS_Store
 
 # DATAS
+data/Sanou-Flix/app/data/raw/animes_list.csv Sanou-Flix/app/data/raw/films_list.csv Sanou-Flix/app/data/raw/series_list.csv
+data_copy/
 data/
 
 # VENV
