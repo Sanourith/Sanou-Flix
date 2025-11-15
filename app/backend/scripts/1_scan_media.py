@@ -4,12 +4,13 @@ Check into directories & get a list of films/animes/series
 """
 
 import datetime
+import json
 import os
 import re
+import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-import cv2
 import pandas as pd
 
 script_path = Path(__file__).parent.absolute()
@@ -66,28 +67,106 @@ def clean_title(raw_name: str) -> str:
     return name
 
 
-# def get_video_duration(film: str) -> str:
-#     """Returns duration of a movie
+def get_video_duration_ffprobe(film_path: str) -> Optional[str]:
+    """
+    Obtient la durée d'une vidéo avec ffprobe (plus rapide et fiable qu'OpenCV).
 
-#     Args:
-#         film (path): Film to describe
+    Args:
+        film_path: Chemin vers le fichier vidéo
 
-#     Returns:
-#         str: film duration, format HH:MM:SS
-#     """
-#     video = cv2.VideoCapture(f"{film}")
-#     frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-#     fps = video.get(cv2.CAP_PROP_FPS)
-#     video.release()
+    Returns:
+        Durée au format HH:MM:SS ou None en cas d'erreur
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                str(film_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
 
-#     if fps == 0:
-#         return "00:00:00"
+        if result.returncode != 0:
+            return None
 
-#     seconds = round(frames / fps)
-#     video_time = datetime.timedelta(seconds=seconds)
-#     video_time_str = str(video_time).replace("0 days ", "")
+        data = json.loads(result.stdout)
 
-#     return video_time_str
+        if "format" not in data or "duration" not in data["format"]:
+            return None
+
+        duration_seconds = int(float(data["format"]["duration"]))
+        duration_str = str(datetime.timedelta(seconds=duration_seconds))
+
+        # Enlever "0 days " si présent (pour vidéos < 24h)
+        return duration_str.replace("0 days ", "")
+
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, KeyError) as e:
+        print(f"    ⚠️  Error reading duration: {e}")
+        return None
+    except FileNotFoundError:
+        print("    ⚠️  ffprobe not found. Install ffmpeg: sudo apt install ffmpeg")
+        return None
+
+
+def get_video_duration_opencv(film_path: str) -> Optional[str]:
+    """
+    Fallback: Obtient la durée avec OpenCV (plus lent mais ne nécessite pas ffprobe).
+
+    Args:
+        film_path: Chemin vers le fichier vidéo
+
+    Returns:
+        Durée au format HH:MM:SS ou None en cas d'erreur
+    """
+    try:
+        import cv2
+
+        video = cv2.VideoCapture(str(film_path))
+        frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        video.release()
+
+        if fps == 0 or frames == 0:
+            return None
+
+        seconds = round(frames / fps)
+        duration_str = str(datetime.timedelta(seconds=seconds))
+        return duration_str.replace("0 days ", "")
+
+    except Exception as e:
+        print(f"    ⚠️  OpenCV error: {e}")
+        return None
+
+
+def get_video_duration(film_path: str, use_ffprobe: bool = True) -> str:
+    """
+    Obtient la durée d'une vidéo en essayant ffprobe puis OpenCV en fallback.
+
+    Args:
+        film_path: Chemin vers le fichier vidéo
+        use_ffprobe: Si True, essaie ffprobe en premier
+
+    Returns:
+        Durée au format HH:MM:SS ou "00:00:00" si échec
+    """
+    duration = None
+
+    if use_ffprobe:
+        duration = get_video_duration_ffprobe(film_path)
+
+    # Fallback to OpenCV if ffprobe failed or not used
+    if duration is None:
+        duration = get_video_duration_opencv(film_path)
+
+    return duration if duration is not None else "00:00:00"
 
 
 def scan_video_directory(
@@ -95,6 +174,7 @@ def scan_video_directory(
     output_csv_name: str,
     category_name: str = "videos",
     recursive: bool = False,
+    use_ffprobe: bool = True,
 ) -> pd.DataFrame:
     """
     Scanne un répertoire de vidéos et génère un CSV avec les métadonnées.
@@ -104,6 +184,7 @@ def scan_video_directory(
         output_csv_name: Nom du fichier CSV de sortie (ex: "films_list.csv")
         category_name: Nom de la catégorie pour les logs (ex: "films", "animes")
         recursive: Si True, scanne les sous-dossiers (pour series/animes)
+        use_ffprobe: Si True, utilise ffprobe (plus rapide), sinon OpenCV
 
     Returns:
         DataFrame contenant les données scannées
@@ -112,6 +193,7 @@ def scan_video_directory(
     print(f"Scanning {category_name.upper()}")
     print(f"Directory: {dir_path}")
     print(f"Recursive: {recursive}")
+    print(f"Method: {'ffprobe' if use_ffprobe else 'OpenCV'}")
     print(f"{'='*60}")
 
     if not dir_path.exists():
@@ -119,6 +201,7 @@ def scan_video_directory(
         return pd.DataFrame()
 
     videos_data: List[Dict[str, Any]] = []
+    error_count = 0
 
     # Si recursive, on cherche tous les fichiers vidéo en profondeur
     if recursive:
@@ -135,7 +218,10 @@ def scan_video_directory(
                 file_extension_str = video_file.suffix.replace(".", "")
                 file_basename = video_file.stem
                 file_name_clean = clean_title(file_basename)
-                file_duration = get_video_duration_ffmpeg(str(video_file))
+                file_duration = get_video_duration(str(video_file), use_ffprobe)
+
+                if file_duration == "00:00:00":
+                    error_count += 1
 
                 videos_data.append(
                     {
@@ -147,8 +233,9 @@ def scan_video_directory(
                     }
                 )
 
+                status = "✓" if file_duration != "00:00:00" else "✗"
                 print(
-                    f"  [{serie_folder}] {file_basename[:40]:<40} | {file_extension_str:>4} | {file_duration}"
+                    f"  {status} [{serie_folder}] {file_basename[:40]:<40} | {file_extension_str:>4} | {file_duration}"
                 )
 
     # Sinon, scan direct (pour films)
@@ -164,7 +251,10 @@ def scan_video_directory(
             file_extension_str = file_extension.replace(".", "")
             file_basename = video_file.stem
             file_name_clean = clean_title(file_basename)
-            file_duration = get_video_duration(video_file)
+            file_duration = get_video_duration(str(video_file), use_ffprobe)
+
+            if file_duration == "00:00:00":
+                error_count += 1
 
             videos_data.append(
                 {
@@ -175,8 +265,9 @@ def scan_video_directory(
                 }
             )
 
+            status = "✓" if file_duration != "00:00:00" else "✗"
             print(
-                f"Treated: {file_basename[:50]:<50} | {file_extension_str:>4} | {file_duration}"
+                f"{status} {file_basename[:50]:<50} | {file_extension_str:>4} | {file_duration}"
             )
 
     # Create DataFrame and save to CSV
@@ -186,6 +277,8 @@ def scan_video_directory(
     df.to_csv(output_path, encoding="utf-8", index=False)
 
     print(f"\n{category_name.capitalize()} found: {len(df)}")
+    if error_count > 0:
+        print(f"⚠️  Errors reading duration: {error_count}")
     print(f"CSV saved to: {output_path}")
     if not df.empty:
         print(f"\nPreview:\n{df.head()}")
@@ -197,9 +290,10 @@ def main():
     print(f"SSD path: {ssd_path}")
     print(f"Video extensions: {', '.join(sorted(video_extensions))}")
 
-    # df_films = scan_video_directory(
-    #     films_path, "films_list.csv", "films", recursive=False
-    # )
+    # Scan all categories
+    df_films = scan_video_directory(
+        films_path, "films_list.csv", "films", recursive=False
+    )
     df_animes = scan_video_directory(
         animes_path, "animes_list.csv", "animes", recursive=True
     )
@@ -207,9 +301,9 @@ def main():
         series_path, "series_list.csv", "series", recursive=True
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Films:  {len(df_films)}")
     print(f"Animes: {len(df_animes)}")
     print(f"Series: {len(df_series)}")
