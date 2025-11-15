@@ -66,28 +66,28 @@ def clean_title(raw_name: str) -> str:
     return name
 
 
-def get_video_duration(film: str) -> str:
-    """Returns duration of a movie
+# def get_video_duration(film: str) -> str:
+#     """Returns duration of a movie
 
-    Args:
-        film (path): Film to describe
+#     Args:
+#         film (path): Film to describe
 
-    Returns:
-        str: film duration, format HH:MM:SS
-    """
-    video = cv2.VideoCapture(f"{film}")
-    frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-    fps = video.get(cv2.CAP_PROP_FPS)
-    video.release()
+#     Returns:
+#         str: film duration, format HH:MM:SS
+#     """
+#     video = cv2.VideoCapture(f"{film}")
+#     frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+#     fps = video.get(cv2.CAP_PROP_FPS)
+#     video.release()
 
-    if fps == 0:
-        return "00:00:00"
+#     if fps == 0:
+#         return "00:00:00"
 
-    seconds = round(frames / fps)
-    video_time = datetime.timedelta(seconds=seconds)
-    video_time_str = str(video_time).replace("0 days ", "")
+#     seconds = round(frames / fps)
+#     video_time = datetime.timedelta(seconds=seconds)
+#     video_time_str = str(video_time).replace("0 days ", "")
 
-    return video_time_str
+#     return video_time_str
 
 
 def scan_video_directory(
@@ -135,7 +135,7 @@ def scan_video_directory(
                 file_extension_str = video_file.suffix.replace(".", "")
                 file_basename = video_file.stem
                 file_name_clean = clean_title(file_basename)
-                file_duration = get_video_duration(video_file)
+                file_duration = get_video_duration_ffmpeg(str(video_file))
 
                 videos_data.append(
                     {
@@ -197,9 +197,9 @@ def main():
     print(f"SSD path: {ssd_path}")
     print(f"Video extensions: {', '.join(sorted(video_extensions))}")
 
-    df_films = scan_video_directory(
-        films_path, "films_list.csv", "films", recursive=False
-    )
+    # df_films = scan_video_directory(
+    #     films_path, "films_list.csv", "films", recursive=False
+    # )
     df_animes = scan_video_directory(
         animes_path, "animes_list.csv", "animes", recursive=True
     )
