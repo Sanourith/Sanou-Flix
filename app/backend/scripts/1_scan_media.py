@@ -18,11 +18,6 @@ root_path = script_path.parent.parent
 
 ssd_path = Path("/media") / os.environ.get("USER", "unknown") / "SSD4OWL"
 
-# sub-dirs
-films_path = ssd_path / "1_Films"
-animes_path = ssd_path / "2.2_Animes"
-series_path = ssd_path / "2_Series"
-
 video_extensions = {
     ".mp4",
     ".mkv",
@@ -38,6 +33,22 @@ video_extensions = {
     ".ts",
 }
 
+def is_wsl():
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except FileNotFoundError:
+        return False
+
+if is_wsl():
+    ssd_path = Path("/mnt/e")
+else:
+    ssd_path = Path("/media/psowl/SSD4OWL")
+
+# sub-dirs
+films_path = ssd_path / "1_Films"
+animes_path = ssd_path / "2.2_Animes"
+series_path = ssd_path / "2_Series"
 
 def clean_title(raw_name: str) -> str:
     """

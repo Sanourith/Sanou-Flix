@@ -27,7 +27,13 @@ if [[ ! "$confirmation" =~ ^[yY]$ ]]; then
   exit 1
 fi
 
-ssd_dir="/media/psowl/SSD4OWL/$media"
+if ! uname -a | grep -q "microsoft"; then
+  echo "Native Linux detected"
+  ssd_dir="/media/psowl/SSD4OWL/$media"
+else
+  echo "WSL detected"
+  ssd_dir="/mnt/e/$media"
+fi
 
 cd "$ssd_dir" || exit 1
 

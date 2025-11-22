@@ -20,7 +20,13 @@ case ${answer,,} in  # ${answer,,} = lowercase auto
     ;;
 esac
 
-ssd_dir="/media/psowl/SSD4OWL/$media"
+if ! uname -a | grep -q "microsoft"; then
+  echo "Native Linux detected"
+  ssd_dir="/media/psowl/SSD4OWL/$media"
+else
+  echo "WSL detected"
+  ssd_dir="/mnt/e/$media"
+fi
 
 # ASK DIR NAME
 echo "This script will only treat one directory from '$media' directory"
