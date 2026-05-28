@@ -34,3 +34,4 @@ source venv-data/bin/activate
 log_info "Installing pip dependencies..."
 pip install openmeteo-requests
 pip install requests-cache retry-requests numpy pandas
+sudo apt install ffmpeg
