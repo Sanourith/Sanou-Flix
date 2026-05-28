@@ -1,0 +1,82 @@
+services:
+
+  # ─────────────────────────────────────────
+  # 1. BASE DE DONNÉES — PostgreSQL
+  # ─────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: sanou-flix-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-sanouflix}
+      POSTGRES_USER:     ${POSTGRES_USER:-sanou}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # persistance données
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql            # script init
+    ports:
+      - "5432:5432"   # exposé localement pour DBeaver / pgAdmin
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sanou} -d ${POSTGRES_DB:-sanouflix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sanou-net
+
+  # ─────────────────────────────────────────
+  # 2. SCANNER — script 1_scan_media.py
+  # ─────────────────────────────────────────
+  scanner:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: sanou-flix-scanner
+    restart: "no"            # job one-shot : tourne une fois et s'arrête
+    depends_on:
+      db:
+        condition: service_healthy   # attend que Postgres soit prêt
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sanou}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-sanouflix}
+      MEDIA_ROOT: /media                          # point de montage du SSD
+    volumes:
+      - ./app:/app                                # hot-reload du code
+      - ./data:/app/data                          # CSV générés par Bash
+      - /media/psowl/SSD4OWL:/media:ro            # ton SSD en lecture seule
+    networks:
+      - sanou-net
+
+  # ─────────────────────────────────────────
+  # 3. API — FastAPI
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: sanou-flix-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sanou}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-sanouflix}
+      MEDIA_ROOT: /media
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+    volumes:
+      - ./api:/app                                # hot-reload en dev
+      - /media/psowl/SSD4OWL:/media:ro            # accès fichiers pour le streaming
+    ports:
+      - "8000:8000"
+    networks:
+      - sanou-net
+
+# ─────────────────────────────────────────
+# VOLUMES & RÉSEAU
+# ─────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  sanou-net:
+    driver: bridge
