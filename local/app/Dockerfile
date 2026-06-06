@@ -16,5 +16,6 @@ RUN pip install --no-cache-dir -r requirements.scanner.txt
 
 # Code source
 COPY . .
+RUN pip install -e .   # installe sanouflix en mode éditable
 
 CMD ["python", "scripts/1_scan_media.py"]
