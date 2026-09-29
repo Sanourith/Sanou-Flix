@@ -25,4 +25,5 @@ data/
 
 # VENV
 venv-*
+venv_*
 .venv/*
